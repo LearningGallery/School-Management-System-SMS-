@@ -179,7 +179,6 @@ This project is licensed under the MIT License.
 - Enterprise-grade application design patterns
 
 ## 📧 Contact
-
-Your Name - [@yourtwitter](https://twitter.com/yourtwitter)
-
-Project Link: [https://github.com/yourusername/school-management-system](https://github.com/LearningGallery/school-management-system)
+**AbuTalha**
+LinkedIn: [AbuTalha](https://www.linkedin.com/in/Im-AbuTalha)
+GitHub: [LearningGallery](https://github.com/LearningGallery/school-management-system)
