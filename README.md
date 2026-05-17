@@ -171,13 +171,6 @@ terraform destroy
 
 This project is licensed under the MIT License.
 
-## 🙏 Acknowledgments
-
-- Built for GitHub portfolio demonstration
-- Showcases Azure cloud-native architecture
-- Demonstrates Terraform IaC best practices
-- Enterprise-grade application design patterns
-
 ## 📧 Contact
 - LinkedIn: [AbuTalha](https://www.linkedin.com/in/Im-AbuTalha)
 - GitHub: [LearningGallery](https://github.com/LearningGallery/school-management-system)
