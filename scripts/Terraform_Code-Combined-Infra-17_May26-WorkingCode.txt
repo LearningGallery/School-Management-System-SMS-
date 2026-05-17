@@ -1,0 +1,1507 @@
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\backend.tf
+========================================
+terraform {
+  backend "azurerm" {
+    #resource_group_name  = "rgsuiamgmtfm01"
+    #storage_account_name = "stguiamgmtfm01"
+    #container_name       = "tfstate"
+    resource_group_name  = "TerraformInfraDevOps"
+    storage_account_name = "terraforminfradevops"
+    container_name       = "terraformstatefiles"
+    key                  = "uat/devsecops.tfstate"
+  }
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\main.tf
+========================================
+# Add these locals for cleaner output references
+locals {
+  web_app_name    = module.container_app_web.name
+  api_app_name    = module.container_app_api.name
+  worker_app_name = module.container_app_worker.name
+}
+
+# Random suffix for globally unique names
+resource "random_string" "suffix" {
+  length  = 6
+  special = false
+  upper   = false
+}
+
+# Resource Group
+module "resource_group" {
+  source   = "./modules/resource_group"
+  name     = "rg-${var.project}-${var.env}"
+  location = var.location
+  tags     = var.tags
+}
+
+# Log Analytics & Application Insights
+module "log_analytics" {
+  source   = "./modules/log_analytics"
+  name     = "log-${var.project}-${var.env}"
+  rg_name  = module.resource_group.name
+  location = var.location
+  tags     = var.tags
+}
+
+# Azure Container Registry
+module "acr" {
+  source   = "./modules/acr"
+  name     = "acr${var.project}${var.env}${random_string.suffix.result}"
+  rg_name  = module.resource_group.name
+  location = var.location
+  tags     = var.tags
+}
+
+# Azure SQL Database
+module "sql" {
+  source         = "./modules/sql"
+  server_name    = "sql-${var.project}-${var.env}-${random_string.suffix.result}"
+  database_name  = "smsdb"
+  rg_name        = module.resource_group.name
+  location       = var.location
+  admin_username = var.sql_admin_username
+  admin_password = var.sql_admin_password
+  tags           = var.tags
+}
+
+# Azure Storage Account
+module "storage" {
+  source   = "./modules/storage"
+  name     = "st${var.project}${var.env}${random_string.suffix.result}"
+  rg_name  = module.resource_group.name
+  location = var.location
+  tags     = var.tags
+}
+
+# Key Vault (optional)
+module "keyvault" {
+  count     = var.enable_keyvault ? 1 : 0
+  source    = "./modules/keyvault"
+  name      = "kv-${var.project}-${var.env}-${random_string.suffix.result}"
+  rg_name   = module.resource_group.name
+  location  = var.location
+  tenant_id = data.azurerm_client_config.current.tenant_id
+  tags      = var.tags
+}
+
+# Container Apps Environment
+module "container_apps_env" {
+  source                     = "./modules/container_apps_env"
+  name                       = "cae-${var.project}-${var.env}"
+  rg_name                    = module.resource_group.name
+  location                   = var.location
+  log_analytics_workspace_id = module.log_analytics.workspace_id
+  tags                       = var.tags
+}
+
+# Container App - API
+module "container_app_api" {
+  source = "./modules/container_app"
+
+  name                  = "ca-${var.project}-api-${var.env}"
+  rg_name               = module.resource_group.name
+  location              = var.location
+  container_apps_env_id = module.container_apps_env.id
+
+  #container_image          = "${module.acr.login_server}/sms-api:latest"
+  container_image          = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+  target_port              = 8080
+  #target_port              = 80
+  ingress_external_enabled = true
+
+  registry_server   = module.acr.login_server
+  registry_username = module.acr.admin_username
+  registry_password = module.acr.admin_password
+
+  cpu          = "0.5"
+  memory       = "1Gi"
+  min_replicas = 1
+  max_replicas = 3
+
+  env_vars = [
+    {
+      name  = "ASPNETCORE_ENVIRONMENT"
+      value = "Production"
+    },
+    {
+      name  = "ConnectionStrings__DefaultConnection"
+      value = "Server=tcp:${module.sql.server_fqdn},1433;Initial Catalog=${module.sql.database_name};User ID=${var.sql_admin_username};Password=${var.sql_admin_password};Encrypt=True;"
+    },
+    {
+      name  = "JwtSettings__Secret"
+      value = var.jwt_secret
+    },
+    {
+      name  = "JwtSettings__Issuer"
+      value = "SchoolSMS"
+    },
+    {
+      name  = "JwtSettings__Audience"
+      value = "SchoolSMS"
+    },
+    {
+      name  = "JwtSettings__ExpiryMinutes"
+      value = "480"
+    },
+    {
+      name  = "BlobStorage__ConnectionString"
+      value = module.storage.primary_connection_string
+    },
+    {
+      name  = "BlobStorage__ContainerName"
+      value = "documents"
+    },
+    {
+      name  = "ApplicationInsights__InstrumentationKey"
+      value = module.log_analytics.app_insights_instrumentation_key
+    }
+  ]
+
+  tags = var.tags
+}
+
+# Container App - Web
+module "container_app_web" {
+  source = "./modules/container_app"
+
+  name                  = "ca-${var.project}-web-${var.env}"
+  rg_name               = module.resource_group.name
+  location              = var.location
+  container_apps_env_id = module.container_apps_env.id
+
+  #container_image          = "${module.acr.login_server}/sms-web:latest"
+  container_image          = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+  target_port              = 3000
+  #target_port              = 80
+  ingress_external_enabled = true
+
+  registry_server   = module.acr.login_server
+  registry_username = module.acr.admin_username
+  registry_password = module.acr.admin_password
+
+  cpu          = "0.25"
+  memory       = "0.5Gi"
+  min_replicas = 1
+  max_replicas = 3
+
+  env_vars = [
+    {
+      name  = "NEXT_PUBLIC_API_URL"
+      value = "https://${module.container_app_api.fqdn}"
+    },
+    {
+      name  = "NODE_ENV"
+      value = "production"
+    }
+  ]
+
+  tags = var.tags
+}
+
+# Container App - Worker (Optional)
+module "container_app_worker" {
+  source = "./modules/container_app"
+
+  name                  = "ca-${var.project}-worker-${var.env}"
+  rg_name               = module.resource_group.name
+  location              = var.location
+  container_apps_env_id = module.container_apps_env.id
+
+  #container_image          = "${module.acr.login_server}/sms-worker:latest"
+  container_image          = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+  target_port              = 0 # No ingress for worker
+  ingress_external_enabled = false
+
+  registry_server   = module.acr.login_server
+  registry_username = module.acr.admin_username
+  registry_password = module.acr.admin_password
+
+  cpu          = "0.25"
+  memory       = "0.5Gi"
+  min_replicas = 1
+  max_replicas = 1
+
+  env_vars = [
+    {
+      name  = "ConnectionStrings__DefaultConnection"
+      value = "Server=tcp:${module.sql.server_fqdn},1433;Initial Catalog=${module.sql.database_name};User ID=${var.sql_admin_username};Password=${var.sql_admin_password};Encrypt=True;"
+    },
+    {
+      name  = "BlobStorage__ConnectionString"
+      value = module.storage.primary_connection_string
+    }
+  ]
+
+  tags = var.tags
+}
+
+# Azure Front Door (Optional)
+module "frontdoor" {
+  count  = var.enable_frontdoor ? 1 : 0
+  source = "./modules/frontdoor"
+
+  name    = "afd-${var.project}-${var.env}"
+  rg_name = module.resource_group.name
+
+  web_origin_hostname = module.container_app_web.fqdn
+  api_origin_hostname = module.container_app_api.fqdn
+
+  tags = var.tags
+}
+
+# Data source for current client config
+data "azurerm_client_config" "current" {}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\output.tf
+========================================
+output "resource_group_name" {
+  value       = module.resource_group.name
+  description = "Resource group name"
+}
+
+output "resource_group_id" {
+  value       = module.resource_group.id
+  description = "Resource group ID"
+}
+
+output "acr_name" {
+  value       = split(".", module.acr.login_server)[0]
+  description = "Azure Container Registry name"
+}
+
+output "acr_login_server" {
+  value       = module.acr.login_server
+  description = "ACR login server URL"
+}
+
+output "sql_server_fqdn" {
+  value       = module.sql.server_fqdn
+  description = "SQL Server FQDN"
+}
+
+output "sql_database_name" {
+  value       = module.sql.database_name
+  description = "SQL Database name"
+}
+
+output "storage_account_name" {
+  value       = module.storage.account_name
+  description = "Storage account name"
+}
+
+output "storage_blob_endpoint" {
+  value       = module.storage.primary_blob_endpoint
+  description = "Storage blob endpoint"
+}
+
+output "web_app_name" {
+  value       = local.web_app_name
+  description = "Web container app name"
+}
+
+output "web_app_url" {
+  value       = "https://${module.container_app_web.fqdn}"
+  description = "Web application URL"
+}
+
+output "api_app_name" {
+  value       = local.api_app_name
+  description = "API container app name"
+}
+
+output "api_app_url" {
+  value       = "https://${module.container_app_api.fqdn}"
+  description = "API application URL"
+}
+
+output "worker_app_name" {
+  value       = local.worker_app_name
+  description = "Worker container app name"
+}
+
+output "frontdoor_endpoint" {
+  value       = var.enable_frontdoor ? "https://${module.frontdoor[0].endpoint_hostname}" : "Front Door not enabled"
+  description = "Front Door endpoint URL"
+}
+
+output "app_insights_name" {
+  value       = "appi-${module.log_analytics.workspace_id}"
+  description = "Application Insights name"
+}
+
+output "log_analytics_workspace_id" {
+  value       = module.log_analytics.workspace_id
+  description = "Log Analytics workspace ID"
+}
+
+# Sensitive outputs
+output "connection_string_sql" {
+  value       = "Server=tcp:${module.sql.server_fqdn},1433;Initial Catalog=${module.sql.database_name};Persist Security Info=False;User ID=${var.sql_admin_username};Password=${var.sql_admin_password};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+  sensitive   = true
+  description = "SQL connection string"
+}
+
+output "app_insights_instrumentation_key" {
+  value       = module.log_analytics.app_insights_instrumentation_key
+  sensitive   = true
+  description = "Application Insights instrumentation key"
+}
+
+output "acr_admin_username" {
+  value       = module.acr.admin_username
+  sensitive   = true
+  description = "ACR admin username"
+}
+
+output "acr_admin_password" {
+  value       = module.acr.admin_password
+  sensitive   = true
+  description = "ACR admin password"
+}
+
+# Deployment summary
+output "deployment_summary" {
+  value       = <<-EOT
+  ========================================
+  School Management System - Deployment Summary
+  ========================================
+  
+  Resource Group: ${module.resource_group.name}
+  Location: ${var.location}
+  Environment: ${var.env}
+  
+  📦 Container Registry:
+     Name: ${split(".", module.acr.login_server)[0]}
+     URL: ${module.acr.login_server}
+  
+  🌐 Applications:
+     Web: https://${module.container_app_web.fqdn}
+     API: https://${module.container_app_api.fqdn}
+     Front Door: ${var.enable_frontdoor ? "https://${module.frontdoor[0].endpoint_hostname}" : "Not enabled"}
+  
+  💾 Database:
+     Server: ${module.sql.server_fqdn}
+     Database: ${module.sql.database_name}
+  
+  📊 Monitoring:
+     Application Insights: View in Azure Portal
+     Log Analytics: View in Azure Portal
+  
+  🔐 Default Login:
+     Email: admin@schoolsms.com
+     Password: Admin@123
+  
+  ⚠️  Next Steps:
+     1. Push Docker images to ACR
+     2. Update Container Apps with new images
+     3. Access the web URL above
+  ========================================
+  EOT
+  description = "Deployment summary with all important URLs and info"
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\provider.tf
+========================================
+provider "azurerm" {
+  features {
+    key_vault {
+      purge_soft_delete_on_destroy = true
+    }
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
+
+  subscription_id = var.subscription_id
+}
+
+provider "random" {}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\terraform.tfvars
+========================================
+subscription_id = "17da8110-ad0a-4bcc-99e3-f83260c6ccc0"
+
+project  = "sms"
+env      = "dev"
+location = "southeastasia"
+
+sql_admin_username = "sqladmin"
+sql_admin_password = "P@ssw0rd123!Strong"                          # Change this!
+jwt_secret         = "ISf7vpGPH4nr3VicZ1NtjWkK2szJmqeuY8lhwXaUTg9dMboQyEB5DCR06LOFAx" # Change this!
+
+enable_frontdoor = true
+enable_keyvault  = false # Set true if you want Key Vault
+
+tags = {
+  project     = "school-management-system"
+  environment = "dev"
+  managed_by  = "terraform"
+  owner       = "github-demo"
+  repository  = "school-sms"
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\variables.tf
+========================================
+variable "subscription_id" {
+  description = "Azure subscription ID"
+  type        = string
+}
+
+variable "project" {
+  description = "Project name"
+  type        = string
+  default     = "sms"
+}
+
+variable "env" {
+  description = "Environment (dev/uat/prod)"
+  type        = string
+  default     = "dev"
+}
+
+variable "location" {
+  description = "Azure region"
+  type        = string
+  default     = "southeastasia"
+}
+
+variable "sql_admin_username" {
+  description = "SQL admin username"
+  type        = string
+  default     = "sqladmin"
+}
+
+variable "sql_admin_password" {
+  description = "SQL admin password"
+  type        = string
+  sensitive   = true
+}
+
+variable "jwt_secret" {
+  description = "JWT signing secret"
+  type        = string
+  sensitive   = true
+}
+
+variable "tags" {
+  description = "Resource tags"
+  type        = map(string)
+  default = {
+    project     = "school-management-system"
+    environment = "dev"
+    managed_by  = "terraform"
+    owner       = "github-demo"
+  }
+}
+
+variable "enable_frontdoor" {
+  description = "Enable Azure Front Door"
+  type        = bool
+  default     = true
+}
+
+variable "enable_keyvault" {
+  description = "Enable Azure Key Vault"
+  type        = bool
+  default     = false
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\versions.tf
+========================================
+terraform {
+  required_version = ">= 1.7.0"
+
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
+  }
+
+  # Uncomment after creating backend storage
+  # backend "azurerm" {
+  #   resource_group_name  = "rg-tfstate-sms"
+  #   storage_account_name = "sttfstatesms"
+  #   container_name       = "tfstate"
+  #   key                  = "prod.terraform.tfstate"
+  # }
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\acr\main.tf
+========================================
+resource "azurerm_container_registry" "this" {
+  name                = var.name
+  resource_group_name = var.rg_name
+  location            = var.location
+  sku                 = "Basic"
+  admin_enabled       = true
+  tags                = var.tags
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\acr\output.tf
+========================================
+output "id" {
+  value = azurerm_container_registry.this.id
+}
+
+output "login_server" {
+  value = azurerm_container_registry.this.login_server
+}
+
+output "admin_username" {
+  value     = azurerm_container_registry.this.admin_username
+  sensitive = true
+}
+
+output "admin_password" {
+  value     = azurerm_container_registry.this.admin_password
+  sensitive = true
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\acr\variables.tf
+========================================
+variable "name" {
+  type = string
+}
+
+variable "rg_name" {
+  type = string
+}
+
+variable "location" {
+  type = string
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\acr\versions.tf
+========================================
+terraform {
+  required_version = ">= 1.7.0"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\container_app\main.tf
+========================================
+resource "azurerm_container_app" "this" {
+  name                         = var.name
+  container_app_environment_id = var.container_apps_env_id
+  resource_group_name          = var.rg_name
+  revision_mode                = "Single"
+
+  registry {
+    server               = var.registry_server
+    username             = var.registry_username
+    password_secret_name = "registry-password"
+  }
+
+  secret {
+    name  = "registry-password"
+    value = var.registry_password
+  }
+
+  template {
+    container {
+      name   = var.name
+      image  = var.container_image
+      cpu    = var.cpu
+      memory = var.memory
+
+      dynamic "env" {
+        for_each = var.env_vars
+        content {
+          name  = env.value.name
+          value = env.value.value
+        }
+      }
+    }
+
+    min_replicas = var.min_replicas
+    max_replicas = var.max_replicas
+  }
+
+  dynamic "ingress" {
+    for_each = var.target_port > 0 ? [1] : []
+    content {
+      external_enabled = var.ingress_external_enabled
+      target_port      = var.target_port
+      traffic_weight {
+        percentage      = 100
+        latest_revision = true
+      }
+    }
+  }
+
+  tags = var.tags
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\container_app\output.tf
+========================================
+output "id" {
+  value = azurerm_container_app.this.id
+}
+
+output "fqdn" {
+  value = try(azurerm_container_app.this.ingress[0].fqdn, "")
+}
+
+output "name" {
+  value = azurerm_container_app.this.name
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\container_app\variables.tf
+========================================
+variable "name" {
+  type = string
+}
+
+variable "rg_name" {
+  type = string
+}
+
+variable "location" {
+  type = string
+}
+
+variable "container_apps_env_id" {
+  type = string
+}
+
+variable "container_image" {
+  type = string
+}
+
+variable "target_port" {
+  type    = number
+  default = 0
+}
+
+variable "ingress_external_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "registry_server" {
+  type = string
+}
+
+variable "registry_username" {
+  type      = string
+  sensitive = true
+}
+
+variable "registry_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "cpu" {
+  type    = string
+  default = "0.25"
+}
+
+variable "memory" {
+  type    = string
+  default = "0.5Gi"
+}
+
+variable "min_replicas" {
+  type    = number
+  default = 1
+}
+
+variable "max_replicas" {
+  type    = number
+  default = 3
+}
+
+variable "env_vars" {
+  type = list(object({
+    name  = string
+    value = string
+  }))
+  default = []
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\container_app\versions.tf
+========================================
+terraform {
+  required_version = ">= 1.7.0"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\container_apps_env\main.tf
+========================================
+resource "azurerm_container_app_environment" "this" {
+  name                       = var.name
+  location                   = var.location
+  resource_group_name        = var.rg_name
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+
+  tags = var.tags
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\container_apps_env\output.tf
+========================================
+output "id" {
+  value = azurerm_container_app_environment.this.id
+}
+
+output "default_domain" {
+  value = azurerm_container_app_environment.this.default_domain
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\container_apps_env\variables.tf
+========================================
+variable "name" {
+  type = string
+}
+
+variable "rg_name" {
+  type = string
+}
+
+variable "location" {
+  type = string
+}
+
+variable "log_analytics_workspace_id" {
+  type = string
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\container_apps_env\versions.tf
+========================================
+terraform {
+  required_version = ">= 1.7.0"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\frontdoor\main.tf
+========================================
+resource "azurerm_cdn_frontdoor_profile" "this" {
+  name                = var.name
+  resource_group_name = var.rg_name
+  sku_name            = "Standard_AzureFrontDoor"
+  tags                = var.tags
+}
+
+resource "azurerm_cdn_frontdoor_endpoint" "this" {
+  name                     = "${var.name}-endpoint"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.this.id
+  tags                     = var.tags
+}
+
+# Origin group for web
+resource "azurerm_cdn_frontdoor_origin_group" "web" {
+  name                     = "web-origin-group"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.this.id
+
+  load_balancing {
+    additional_latency_in_milliseconds = 50
+    sample_size                        = 4
+    successful_samples_required        = 3
+  }
+
+  health_probe {
+    interval_in_seconds = 100
+    path                = "/"
+    protocol            = "Https"
+    request_type        = "HEAD"
+  }
+}
+
+# Origin for web
+resource "azurerm_cdn_frontdoor_origin" "web" {
+  name                          = "web-origin"
+  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.web.id
+
+  host_name          = var.web_origin_hostname
+  http_port          = 80
+  https_port         = 443
+  origin_host_header = var.web_origin_hostname
+  priority           = 1
+  weight             = 1000
+  certificate_name_check_enabled = true
+  enabled                        = true
+}
+
+# Origin group for API
+resource "azurerm_cdn_frontdoor_origin_group" "api" {
+  name                     = "api-origin-group"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.this.id
+
+  load_balancing {
+    additional_latency_in_milliseconds = 50
+    sample_size                        = 4
+    successful_samples_required        = 3
+  }
+
+  health_probe {
+    interval_in_seconds = 100
+    path                = "/health"
+    protocol            = "Https"
+    request_type        = "HEAD"
+  }
+}
+
+# Origin for API
+resource "azurerm_cdn_frontdoor_origin" "api" {
+  name                          = "api-origin"
+  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.api.id
+
+  host_name          = var.api_origin_hostname
+  http_port          = 80
+  https_port         = 443
+  origin_host_header = var.api_origin_hostname
+  priority           = 1
+  weight             = 1000
+  certificate_name_check_enabled = true
+  enabled                        = true
+}
+
+# Route for web (/)
+resource "azurerm_cdn_frontdoor_route" "web" {
+  name                          = "web-route"
+  cdn_frontdoor_endpoint_id     = azurerm_cdn_frontdoor_endpoint.this.id
+  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.web.id
+  cdn_frontdoor_origin_ids      = [azurerm_cdn_frontdoor_origin.web.id]
+
+  supported_protocols    = ["Http", "Https"]
+  patterns_to_match      = ["/*"]
+  forwarding_protocol    = "HttpsOnly"
+  link_to_default_domain = true
+  https_redirect_enabled = true
+}
+
+# Route for API (/api/*)
+resource "azurerm_cdn_frontdoor_route" "api" {
+  name                          = "api-route"
+  cdn_frontdoor_endpoint_id     = azurerm_cdn_frontdoor_endpoint.this.id
+  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.api.id
+  cdn_frontdoor_origin_ids      = [azurerm_cdn_frontdoor_origin.api.id]
+
+  supported_protocols    = ["Http", "Https"]
+  patterns_to_match      = ["/api/*"]
+  forwarding_protocol    = "HttpsOnly"
+  link_to_default_domain = true
+  https_redirect_enabled = true
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\frontdoor\output.tf
+========================================
+output "id" {
+  value = azurerm_cdn_frontdoor_profile.this.id
+}
+
+output "endpoint_hostname" {
+  value = azurerm_cdn_frontdoor_endpoint.this.host_name
+}
+
+output "endpoint_url" {
+  value = "https://${azurerm_cdn_frontdoor_endpoint.this.host_name}"
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\frontdoor\variables.tf
+========================================
+variable "name" {
+  type = string
+}
+
+variable "rg_name" {
+  type = string
+}
+
+variable "web_origin_hostname" {
+  type = string
+}
+
+variable "api_origin_hostname" {
+  type = string
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\frontdoor\versions.tf
+========================================
+terraform {
+  required_version = ">= 1.7.0"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\keyvault\main.tf
+========================================
+data "azurerm_client_config" "current" {}
+
+resource "azurerm_key_vault" "this" {
+  name                       = var.name
+  location                   = var.location
+  resource_group_name        = var.rg_name
+  tenant_id                  = var.tenant_id
+  sku_name                   = "standard"
+  soft_delete_retention_days = 7
+  purge_protection_enabled   = false
+
+  tags = var.tags
+}
+
+# Access policy for current user/service principal
+resource "azurerm_key_vault_access_policy" "deployer" {
+  key_vault_id = azurerm_key_vault.this.id
+  tenant_id    = var.tenant_id
+  object_id    = data.azurerm_client_config.current.object_id
+
+  secret_permissions = [
+    "Get", "List", "Set", "Delete", "Purge", "Recover"
+  ]
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\keyvault\output.tf
+========================================
+output "id" {
+  value = azurerm_key_vault.this.id
+}
+
+output "vault_uri" {
+  value = azurerm_key_vault.this.vault_uri
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\keyvault\variables.tf
+========================================
+variable "name" {
+  type = string
+}
+
+variable "rg_name" {
+  type = string
+}
+
+variable "location" {
+  type = string
+}
+
+variable "tenant_id" {
+  type = string
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\keyvault\versions.tf
+========================================
+terraform {
+  required_version = ">= 1.7.0"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\log_analytics\main.tf
+========================================
+resource "azurerm_log_analytics_workspace" "this" {
+  name                = var.name
+  location            = var.location
+  resource_group_name = var.rg_name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+  tags                = var.tags
+}
+
+resource "azurerm_application_insights" "this" {
+  name                = "appi-${var.name}"
+  location            = var.location
+  resource_group_name = var.rg_name
+  workspace_id        = azurerm_log_analytics_workspace.this.id
+  application_type    = "web"
+  tags                = var.tags
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\log_analytics\output.tf
+========================================
+output "workspace_id" {
+  value = azurerm_log_analytics_workspace.this.id
+}
+
+output "workspace_customer_id" {
+  value = azurerm_log_analytics_workspace.this.workspace_id
+}
+
+output "workspace_primary_key" {
+  value     = azurerm_log_analytics_workspace.this.primary_shared_key
+  sensitive = true
+}
+
+output "app_insights_instrumentation_key" {
+  value     = azurerm_application_insights.this.instrumentation_key
+  sensitive = true
+}
+
+output "app_insights_connection_string" {
+  value     = azurerm_application_insights.this.connection_string
+  sensitive = true
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\log_analytics\variables.tf
+========================================
+variable "name" {
+  type = string
+}
+
+variable "rg_name" {
+  type = string
+}
+
+variable "location" {
+  type = string
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\log_analytics\versions.tf
+========================================
+terraform {
+  required_version = ">= 1.7.0"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\resource_group\main.tf
+========================================
+resource "azurerm_resource_group" "this" {
+  name     = var.name
+  location = var.location
+  tags     = var.tags
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\resource_group\output.tf
+========================================
+output "name" {
+  value = azurerm_resource_group.this.name
+}
+
+output "location" {
+  value = azurerm_resource_group.this.location
+}
+
+output "id" {
+  value = azurerm_resource_group.this.id
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\resource_group\variables.tf
+========================================
+variable "name" {
+  type = string
+}
+
+variable "location" {
+  type = string
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\resource_group\versions.tf
+========================================
+terraform {
+  required_version = ">= 1.7.0"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\sql\main.tf
+========================================
+resource "azurerm_mssql_server" "this" {
+  name                         = var.server_name
+  resource_group_name          = var.rg_name
+  location                     = var.location
+  version                      = "12.0"
+  administrator_login          = var.admin_username
+  administrator_login_password = var.admin_password
+  minimum_tls_version          = "1.2"
+
+  tags = var.tags
+}
+
+resource "azurerm_mssql_database" "this" {
+  name           = var.database_name
+  server_id      = azurerm_mssql_server.this.id
+  collation      = "SQL_Latin1_General_CP1_CI_AS"
+  max_size_gb    = 2
+  sku_name       = "Basic"
+  zone_redundant = false
+
+  tags = var.tags
+}
+
+# Allow Azure services
+resource "azurerm_mssql_firewall_rule" "azure_services" {
+  name             = "AllowAzureServices"
+  server_id        = azurerm_mssql_server.this.id
+  start_ip_address = "0.0.0.0"
+  end_ip_address   = "0.0.0.0"
+}
+
+# Allow your IP for management (optional - add your IP)
+# resource "azurerm_mssql_firewall_rule" "admin" {
+#   name             = "AllowAdminIP"
+#   server_id        = azurerm_mssql_server.this.id
+#   start_ip_address = "YOUR_PUBLIC_IP"
+#   end_ip_address   = "YOUR_PUBLIC_IP"
+# }
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\sql\output.tf
+========================================
+output "server_id" {
+  value = azurerm_mssql_server.this.id
+}
+
+output "server_fqdn" {
+  value = azurerm_mssql_server.this.fully_qualified_domain_name
+}
+
+output "database_id" {
+  value = azurerm_mssql_database.this.id
+}
+
+output "database_name" {
+  value = azurerm_mssql_database.this.name
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\sql\variables.tf
+========================================
+variable "server_name" {
+  type = string
+}
+
+variable "database_name" {
+  type = string
+}
+
+variable "rg_name" {
+  type = string
+}
+
+variable "location" {
+  type = string
+}
+
+variable "admin_username" {
+  type = string
+}
+
+variable "admin_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\sql\versions.tf
+========================================
+terraform {
+  required_version = ">= 1.7.0"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\storage\main.tf
+========================================
+resource "azurerm_storage_account" "this" {
+  name                     = var.name
+  resource_group_name      = var.rg_name
+  location                 = var.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  min_tls_version          = "TLS1_2"
+
+  blob_properties {
+    cors_rule {
+      allowed_headers    = ["*"]
+      allowed_methods    = ["GET", "HEAD", "POST", "PUT"]
+      allowed_origins    = ["*"]
+      exposed_headers    = ["*"]
+      max_age_in_seconds = 3600
+    }
+  }
+
+  tags = var.tags
+}
+
+resource "azurerm_storage_container" "documents" {
+  name                  = "documents"
+  storage_account_id  = azurerm_storage_account.this.id
+  container_access_type = "private"
+}
+
+resource "azurerm_storage_container" "avatars" {
+  name                  = "avatars"
+  storage_account_id  = azurerm_storage_account.this.id
+  container_access_type = "blob"
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\storage\output.tf
+========================================
+output "account_id" {
+  value = azurerm_storage_account.this.id
+}
+
+output "account_name" {
+  value = azurerm_storage_account.this.name
+}
+
+output "primary_connection_string" {
+  value     = azurerm_storage_account.this.primary_connection_string
+  sensitive = true
+}
+
+output "primary_blob_endpoint" {
+  value = azurerm_storage_account.this.primary_blob_endpoint
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\storage\variables.tf
+========================================
+variable "name" {
+  type = string
+}
+
+variable "rg_name" {
+  type = string
+}
+
+variable "location" {
+  type = string
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\modules\storage\versions.tf
+========================================
+terraform {
+  required_version = ">= 1.7.0"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+}
+
+
+========================================
+File Path: H:\Azure-DevOps_Learning\School Management System (SMS)\School-Management-System-SMS\Infra\terraform-bootstrap\main.tf
+========================================
+# Bootstrap Terraform State Backend
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.116"
+    }
+  }
+}
+
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "tfstate" {
+  name     = "rgsuiamgmtfm01"
+  location = "southeastasia"
+
+  tags = {
+    Purpose   = "Terraform State Backend"
+    ManagedBy = "Terraform"
+  }
+}
+
+resource "azurerm_storage_account" "tfstate" {
+  name                     = "stguiamgmtfm01"
+  resource_group_name      = azurerm_resource_group.tfstate.name
+  location                 = azurerm_resource_group.tfstate.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+
+  blob_properties {
+    versioning_enabled = true
+  }
+
+  tags = {
+    Purpose   = "Terraform State Storage"
+    ManagedBy = "Terraform"
+  }
+}
+
+resource "azurerm_storage_container" "tfstate" {
+  name                  = "tfstate"
+  storage_account_name  = azurerm_storage_account.tfstate.name
+  container_access_type = "private"
+}
+
+output "resource_group_name" {
+  value = azurerm_resource_group.tfstate.name
+}
+
+output "storage_account_name" {
+  value = azurerm_storage_account.tfstate.name
+}
+
+output "container_name" {
+  value = azurerm_storage_container.tfstate.name
+}
+
+
