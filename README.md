@@ -1,103 +1,44 @@
-# School Management System
+# School Management System (SMS)
 
-Enterprise-grade School Management System built with **Azure cloud-native services**, deployed via **Terraform**, featuring custom JWT authentication.
+A cloud-native School Management System built on **Microsoft Azure** using **Terraform**, **Azure Container Apps**, **Azure SQL Database**, **Azure Storage**, and **Azure Front Door**.
 
-![Architecture](https://img.shields.io/badge/Azure-Container_Apps-blue)
-![Terraform](https://img.shields.io/badge/IaC-Terraform-purple)
-![.NET](https://img.shields.io/badge/.NET-8.0-blue)
-![Next.js](https://img.shields.io/badge/Next.js-14-black)
+This project is designed as:
+- a GitHub portfolio showcase,
+- an Azure-native reference architecture,
+- a fully deployable infrastructure + application solution,
+- a documentation-rich enterprise-style demo.
 
-## 🏗️ Architecture
+---
 
-### Infrastructure Components
-- **Azure Front Door Standard** - Global routing, HTTPS, path-based routing
-- **Azure Container Apps** - Serverless container hosting (Web, API, Worker)
-- **Azure Container Registry** - Private Docker registry
-- **Azure SQL Database** - Relational data store
-- **Azure Storage Account** - Document/file storage
-- **Application Insights** - APM and monitoring
-- **Log Analytics** - Centralized logging
+## Project Highlights
 
-### Application Stack
-- **Backend**: .NET 8 Web API (Clean Architecture)
-- **Frontend**: Next.js 14 (App Router, TypeScript)
-- **Worker**: .NET 8 Background Service
-- **Authentication**: Custom JWT (bcrypt password hashing)
-- **Database**: SQL Server with EF Core
+- **Infrastructure as Code** with Terraform
+- **Frontend** built with Next.js
+- **Backend API** built with .NET 8 Web API
+- **Background Worker** built with .NET Worker Service
+- **Authentication** using custom JWT
+- **Runtime** on Azure Container Apps
+- **Database** on Azure SQL Database
+- **Document Storage** on Azure Blob Storage
+- **Monitoring** with Application Insights and Log Analytics
+- **Edge Routing** with Azure Front Door Standard
 
-## 📁 Repository Structure
+---
 
-```
-school-management-system/
-├── infra/                   # Terraform IaC
-│   ├── main.tf
-│   ├── variables.tf
-│   ├── outputs.tf
-│   ├── provider.tf
-│   ├── versions.tf
-│   └── modules/             # Reusable Terraform modules
-├── apps/
-│   ├── api/                 # .NET 8 API
-│   ├── web/                 # Next.js frontend
-│   └── worker/              # Background worker
-├── scripts/                 # Deployment automation
-└── .github/workflows/       # CI/CD pipelines
-```
+## Architecture Summary
 
-## 🚀 Quick Start
+The solution consists of:
+- **sms-web** → frontend web application
+- **sms-api** → backend API
+- **sms-worker** → background worker (optional in current MVP)
 
-### Prerequisites
-- Azure subscription with Contributor access
-- Azure CLI installed
-- Terraform >= 1.7.0
-- Docker Desktop
-- .NET 8 SDK (for local development)
-- Node.js 20+ (for local development)
+Requests flow through **Azure Front Door**, which routes traffic to the web app and API.  
+The API integrates with **Azure SQL Database**, **Azure Blob Storage**, and **Azure monitoring services**.  
+Container images are stored in **Azure Container Registry** and deployed to **Azure Container Apps**.
 
-### 1. Clone Repository
-```bash
-git clone https://github.com/yourusername/school-management-system.git
-cd school-management-system
-```
+---
 
-### 2. Bootstrap Infrastructure
-```bash
-# Login to Azure
-az login
-
-# Run bootstrap script
-chmod +x scripts/bootstrap.sh
-./scripts/bootstrap.sh
-```
-
-### 3. Deploy Infrastructure
-```bash
-cd infra
-
-# Review plan
-terraform plan
-
-# Apply
-terraform apply
-```
-
-### 4. Deploy Applications
-```bash
-# Build and push containers
-chmod +x scripts/deploy.sh
-cd ..
-./scripts/deploy.sh
-```
-
-### 5. Access Application
-```bash
-cd infra
-terraform output frontdoor_endpoint
-```
-
-Visit the Front Door endpoint in your browser.
-
-## 🔐 Demo Credentials
+## Demo Credentials
 
 | Role | Email | Password |
 |------|-------|----------|
@@ -105,72 +46,143 @@ Visit the Front Door endpoint in your browser.
 | Teacher | teacher@schoolsms.com | Teacher@123 |
 | Student | student@schoolsms.com | Student@123 |
 
-## 🎯 Features
+---
 
-### Implemented Modules
-- ✅ User Management (Role-based)
-- ✅ Student Information System
-- ✅ Teacher Management
-- ✅ Classroom Management
-- ✅ Attendance Tracking
-- ✅ Grade Management
-- ✅ Fee Payment Tracking
-- ✅ Announcements
+## Quick Start
 
-### Planned Features
-- 📅 Timetable/Schedule Management
-- 📊 Advanced Analytics Dashboard
-- 📱 Mobile App (React Native)
-- 🔔 Real-time Notifications (SignalR)
-- 📄 Report Generation (PDF)
-- 📧 Email Integration
-- 🗂️ Document Management
-
-## 🛠️ Local Development
-
-### Run API Locally
+### 1. Clone the repository
 ```bash
-cd apps/api/src/Sms.Api
-dotnet run
+git clone https://github.com/yourusername/School-Management-System-SMS.git
+cd School-Management-System-SMS
 ```
-API will be available at `http://localhost:8080`
 
-### Run Web Locally
-```bash
-cd apps/web
-npm install
-npm run dev
-```
-Web will be available at `http://localhost:3000`
-
-## 📊 Monitoring
-
-Access Application Insights in Azure Portal:
+### 2. Deploy infrastructure
 ```bash
 cd infra
-terraform output | grep app_insights
+terraform init
+terraform plan
+terraform apply
 ```
 
-## 🧹 Cleanup
-
-To destroy all resources:
+### 3. Build and push application images
+Use Azure Container Registry remote build:
 ```bash
-cd infra
-terraform destroy
+cd ../apps/api
+az acr build --registry <acr-name> --image sms-api:v1 .
+
+cd ../web
+az acr build --registry <acr-name> --image sms-web:v1 .
+
+cd ..
+az acr build --registry <acr-name> --image sms-worker:v1 --file worker/Dockerfile .
 ```
 
-## 🤝 Contributing
+### 4. Update Azure Container Apps
+```bash
+az containerapp update --name ca-sms-api-dev --resource-group rg-sms-dev --image <acr>.azurecr.io/sms-api:v1
+az containerapp update --name ca-sms-web-dev --resource-group rg-sms-dev --image <acr>.azurecr.io/sms-web:v1
+az containerapp update --name ca-sms-worker-dev --resource-group rg-sms-dev --image <acr>.azurecr.io/sms-worker:v1
+```
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+### 5. Validate
+- Open the web URL
+- Log in with demo credentials
+- Check API health endpoint
 
-## 📝 License
+For full instructions, see the [Deployment Guide](./docs/05-DEPLOYMENT.md).
 
-This project is licensed under the MIT License.
+---
 
-## 📧 Contact
-- LinkedIn: [AbuTalha](https://www.linkedin.com/in/Im-AbuTalha)
-- GitHub: [LearningGallery](https://github.com/LearningGallery/school-management-system)
+## Documentation
+
+All documentation is located in the [`docs/`](./docs) folder.
+
+### Core Documents
+- [Documentation Home](./docs/INDEX.md)
+- [Objectives](./docs/00-OBJECTIVES.md)
+- [Project Structure](./docs/01-STRUCTURE.md)
+- [Architecture Overview](./docs/02-ARCHITECTURE.md)
+- [High-Level Design (HLD)](./docs/03-HLD.md)
+- [Low-Level Design (LLD)](./docs/04-LLD.md)
+- [Deployment Guide](./docs/05-DEPLOYMENT.md)
+- [Security Guide](./docs/06-SECURITY.md)
+- [Runbook](./docs/07-RUNBOOK.md)
+- [RBAC Matrix](./docs/08-RBAC-MATRIX.md)
+- [Data Model](./docs/09-DATA-MODEL.md)
+- [Troubleshooting](./docs/10-TROUBLESHOOTING.md)
+- [Known Issues](./docs/11-KNOWN-ISSUES.md)
+- [Roadmap](./docs/12-ROADMAP.md)
+
+### Architecture Decision Records
+- [ADR-001: Container Apps vs AKS](./docs/adr/ADR-001-Container-Apps-vs-AKS.md)
+- [ADR-002: Custom JWT vs Entra ID](./docs/adr/ADR-002-Custom-JWT-vs-Entra-ID.md)
+- [ADR-003: Azure Front Door Standard vs Premium](./docs/adr/ADR-003-Azure-Front-Door-Standard-vs-Premium.md)
+- [ADR-004: Azure SQL vs PostgreSQL](./docs/adr/ADR-004-Azure-SQL-vs-PostgreSQL.md)
+- [ADR-005: Application Decomposition (Web/API/Worker)](./docs/adr/ADR-005-Application-Decomposition-Web-API-Worker.md)
+
+---
+
+## Project Structure
+
+```text
+School-Management-System-SMS/
+├── README.md
+├── docs/
+├── infra/
+├── apps/
+│   ├── api/
+│   ├── web/
+│   └── worker/
+├── scripts/
+└── .github/
+```
+
+For more details, see [Project Structure](./docs/01-STRUCTURE.md).
+
+---
+
+## Current Scope
+
+### Included
+- Azure-native deployment
+- JWT authentication
+- role-based access
+- student, classroom, attendance, and announcement modules
+- Terraform-based infrastructure
+- Azure Container Apps deployment
+
+### Not Yet Included
+- Entra ID / SSO
+- private endpoints
+- Key Vault integration
+- production-grade WAF hardening
+- advanced CI/CD promotion
+- multi-region disaster recovery
+
+See [Known Issues](./docs/11-KNOWN-ISSUES.md) and [Roadmap](./docs/12-ROADMAP.md).
+
+---
+
+## Technology Stack
+
+| Layer | Technology |
+|------|------------|
+| Frontend | Next.js, TypeScript, Tailwind CSS |
+| API | .NET 8 Web API |
+| Worker | .NET Worker Service |
+| ORM | Entity Framework Core |
+| Database | Azure SQL Database |
+| Storage | Azure Blob Storage |
+| Runtime | Azure Container Apps |
+| Registry | Azure Container Registry |
+| Edge | Azure Front Door Standard |
+| Monitoring | Application Insights, Log Analytics |
+| IaC | Terraform |
+
+---
+
+## Contact
+
+**AbuTalha**  
+- LinkedIn: [Im-AbuTalha](https://www.linkedin.com/in/Im-AbuTalha)  
+- GitHub: [LearningGallery](https://github.com/LearningGallery)
