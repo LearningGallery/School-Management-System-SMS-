@@ -1,5 +1,22 @@
 # School Management System (SMS)
 
+![Terraform](https://img.shields.io/badge/Terraform-%3E%3D%201.7.0-623CE4?logo=terraform&logoColor=white)
+![Azure](https://img.shields.io/badge/Microsoft%20Azure-Cloud-0078D4?logo=microsoftazure&logoColor=white)
+![Container Apps](https://img.shields.io/badge/Azure%20Container%20Apps-Serverless%20Containers-5E5ADB)
+![Front Door](https://img.shields.io/badge/Azure%20Front%20Door-Standard-0078D4)
+![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=next.js&logoColor=white)
+![.NET](https://img.shields.io/badge/.NET-8-512BD4?logo=dotnet&logoColor=white)
+![Azure SQL](https://img.shields.io/badge/Azure%20SQL-Database-CC2927?logo=microsoftsqlserver&logoColor=white)
+![JWT](https://img.shields.io/badge/Auth-JWT-F59E0B)
+![Monitoring](https://img.shields.io/badge/Monitoring-App%20Insights%20%2B%20Log%20Analytics-C2185B)
+![IaC](https://img.shields.io/badge/Infrastructure%20as%20Code-Terraform-623CE4)
+![Architecture](https://img.shields.io/badge/Architecture-Cloud--Native-22C55E)
+![Portfolio](https://img.shields.io/badge/Use%20Case-GitHub%20Portfolio-blueviolet)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Docs](https://img.shields.io/badge/Docs-Complete-brightgreen)
+![Demo Ready](https://img.shields.io/badge/Demo-Ready-success)
+
+
 A cloud-native School Management System built on **Microsoft Azure** using **Terraform**, **Azure Container Apps**, **Azure SQL Database**, **Azure Storage**, and **Azure Front Door**.
 
 This project is designed as:
