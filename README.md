@@ -1,4 +1,4 @@
-# School Management System (SMS)
+# 🎓 School Management System (SMS)
 
 ![Terraform](https://img.shields.io/badge/Terraform-%3E%3D%201.7.0-623CE4?logo=terraform&logoColor=white)
 ![Azure](https://img.shields.io/badge/Microsoft%20Azure-Cloud-0078D4?logo=microsoftazure&logoColor=white)
@@ -16,38 +16,39 @@
 ![Docs](https://img.shields.io/badge/Docs-Complete-brightgreen)
 ![Demo Ready](https://img.shields.io/badge/Demo-Ready-success)
 
+---
 
-A cloud-native School Management System built on **Microsoft Azure** using **Terraform**, **Azure Container Apps**, **Azure SQL Database**, **Azure Storage**, and **Azure Front Door**.
+☁️ A cloud-native School Management System built on **Microsoft Azure** using **Terraform**, **Azure Container Apps**, **Azure SQL Database**, **Azure Storage**, and **Azure Front Door**.
 
 This project is designed as:
-- a GitHub portfolio showcase,
-- an Azure-native reference architecture,
-- a fully deployable infrastructure + application solution,
-- a documentation-rich enterprise-style demo.
+- 📌 a GitHub portfolio showcase,
+- 🏗️ an Azure-native reference architecture,
+- 🚀 a fully deployable infrastructure + application solution,
+- 📚 a documentation-rich enterprise-style demo.
 
 ---
 
-## Project Highlights
+## ✨ Project Highlights
 
-- **Infrastructure as Code** with Terraform
-- **Frontend** built with Next.js
-- **Backend API** built with .NET 8 Web API
-- **Background Worker** built with .NET Worker Service
-- **Authentication** using custom JWT
-- **Runtime** on Azure Container Apps
-- **Database** on Azure SQL Database
-- **Document Storage** on Azure Blob Storage
-- **Monitoring** with Application Insights and Log Analytics
-- **Edge Routing** with Azure Front Door Standard
+- 🏗️ **Infrastructure as Code** with Terraform
+- 🖥️ **Frontend** built with Next.js
+- 🔧 **Backend API** built with .NET 8 Web API
+- ⚙️ **Background Worker** built with .NET Worker Service
+- 🔐 **Authentication** using custom JWT
+- ☁️ **Runtime** on Azure Container Apps
+- 🗄️ **Database** on Azure SQL Database
+- 📦 **Document Storage** on Azure Blob Storage
+- 📊 **Monitoring** with Application Insights and Log Analytics
+- 🌐 **Edge Routing** with Azure Front Door Standard
 
 ---
 
-## Architecture Summary
+## 🧭 Architecture Summary
 
 The solution consists of:
-- **sms-web** → frontend web application
-- **sms-api** → backend API
-- **sms-worker** → background worker (optional in current MVP)
+- 🟩 **sms-web** → frontend web application
+- 🟥 **sms-api** → backend API
+- 🟪 **sms-worker** → background worker (optional in current MVP)
 
 Requests flow through **Azure Front Door**, which routes traffic to the web app and API.  
 The API integrates with **Azure SQL Database**, **Azure Blob Storage**, and **Azure monitoring services**.  
@@ -55,7 +56,7 @@ Container images are stored in **Azure Container Registry** and deployed to **Az
 
 ---
 
-## Demo Credentials
+## 🔑 Demo Credentials
 
 | Role | Email | Password |
 |------|-------|----------|
@@ -65,15 +66,15 @@ Container images are stored in **Azure Container Registry** and deployed to **Az
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Clone the repository
+### 1️⃣ Clone the repository
 ```bash
 git clone https://github.com/yourusername/School-Management-System-SMS.git
 cd School-Management-System-SMS
 ```
 
-### 2. Deploy infrastructure
+### 2️⃣ Deploy infrastructure
 ```bash
 cd infra
 terraform init
@@ -81,7 +82,7 @@ terraform plan
 terraform apply
 ```
 
-### 3. Build and push application images
+### 3️⃣ Build and push application images
 Use Azure Container Registry remote build:
 ```bash
 cd ../apps/api
@@ -94,43 +95,43 @@ cd ..
 az acr build --registry <acr-name> --image sms-worker:v1 --file worker/Dockerfile .
 ```
 
-### 4. Update Azure Container Apps
+### 4️⃣ Update Azure Container Apps
 ```bash
 az containerapp update --name ca-sms-api-dev --resource-group rg-sms-dev --image <acr>.azurecr.io/sms-api:v1
 az containerapp update --name ca-sms-web-dev --resource-group rg-sms-dev --image <acr>.azurecr.io/sms-web:v1
 az containerapp update --name ca-sms-worker-dev --resource-group rg-sms-dev --image <acr>.azurecr.io/sms-worker:v1
 ```
 
-### 5. Validate
-- Open the web URL
-- Log in with demo credentials
-- Check API health endpoint
+### 5️⃣ Validate
+- 🌍 Open the web URL
+- 🔐 Log in with demo credentials
+- ❤️ Check API health endpoint
 
 For full instructions, see the [Deployment Guide](./docs/05-DEPLOYMENT.md).
 
 ---
 
-## Documentation
+## 📘 Documentation
 
 All documentation is located in the [`docs/`](./docs) folder.
 
-### Core Documents
-- [Documentation Home](./docs/INDEX.md)
-- [Objectives](./docs/00-OBJECTIVES.md)
-- [Project Structure](./docs/01-STRUCTURE.md)
-- [Architecture Overview](./docs/02-ARCHITECTURE.md)
-- [High-Level Design (HLD)](./docs/03-HLD.md)
-- [Low-Level Design (LLD)](./docs/04-LLD.md)
-- [Deployment Guide](./docs/05-DEPLOYMENT.md)
-- [Security Guide](./docs/06-SECURITY.md)
-- [Runbook](./docs/07-RUNBOOK.md)
-- [RBAC Matrix](./docs/08-RBAC-MATRIX.md)
-- [Data Model](./docs/09-DATA-MODEL.md)
-- [Troubleshooting](./docs/10-TROUBLESHOOTING.md)
-- [Known Issues](./docs/11-KNOWN-ISSUES.md)
-- [Roadmap](./docs/12-ROADMAP.md)
+### 📂 Core Documents
+- [🏠 Documentation Home](./docs/INDEX.md)
+- [🎯 Objectives](./docs/00-OBJECTIVES.md)
+- [🗂️ Project Structure](./docs/01-STRUCTURE.md)
+- [🏛️ Architecture Overview](./docs/02-ARCHITECTURE.md)
+- [📐 High-Level Design (HLD)](./docs/03-HLD.md)
+- [🧩 Low-Level Design (LLD)](./docs/04-LLD.md)
+- [🚀 Deployment Guide](./docs/05-DEPLOYMENT.md)
+- [🔐 Security Guide](./docs/06-SECURITY.md)
+- [🛠️ Runbook](./docs/07-RUNBOOK.md)
+- [👥 RBAC Matrix](./docs/08-RBAC-MATRIX.md)
+- [🗄️ Data Model](./docs/09-DATA-MODEL.md)
+- [🧯 Troubleshooting](./docs/10-TROUBLESHOOTING.md)
+- [⚠️ Known Issues](./docs/11-KNOWN-ISSUES.md)
+- [🛣️ Roadmap](./docs/12-ROADMAP.md)
 
-### Architecture Decision Records
+### 🏗️ Architecture Decision Records
 - [ADR-001: Container Apps vs AKS](./docs/adr/ADR-001-Container-Apps-vs-AKS.md)
 - [ADR-002: Custom JWT vs Entra ID](./docs/adr/ADR-002-Custom-JWT-vs-Entra-ID.md)
 - [ADR-003: Azure Front Door Standard vs Premium](./docs/adr/ADR-003-Azure-Front-Door-Standard-vs-Premium.md)
@@ -139,7 +140,7 @@ All documentation is located in the [`docs/`](./docs) folder.
 
 ---
 
-## Project Structure
+## 🗃️ Project Structure
 
 ```text
 School-Management-System-SMS/
@@ -158,9 +159,9 @@ For more details, see [Project Structure](./docs/01-STRUCTURE.md).
 
 ---
 
-## Current Scope
+## 📌 Current Scope
 
-### Included
+### ✅ Included
 - Azure-native deployment
 - JWT authentication
 - role-based access
@@ -168,7 +169,7 @@ For more details, see [Project Structure](./docs/01-STRUCTURE.md).
 - Terraform-based infrastructure
 - Azure Container Apps deployment
 
-### Not Yet Included
+### ⏳ Not Yet Included
 - Entra ID / SSO
 - private endpoints
 - Key Vault integration
@@ -180,7 +181,7 @@ See [Known Issues](./docs/11-KNOWN-ISSUES.md) and [Roadmap](./docs/12-ROADMAP.md
 
 ---
 
-## Technology Stack
+## 🧰 Technology Stack
 
 | Layer | Technology |
 |------|------------|
@@ -198,8 +199,8 @@ See [Known Issues](./docs/11-KNOWN-ISSUES.md) and [Roadmap](./docs/12-ROADMAP.md
 
 ---
 
-## Contact
+## 📬 Contact
 
 **AbuTalha**  
-- LinkedIn: [Im-AbuTalha](https://www.linkedin.com/in/Im-AbuTalha)  
-- GitHub: [LearningGallery](https://github.com/LearningGallery)
+- 💼 LinkedIn: [Im-AbuTalha](https://www.linkedin.com/in/Im-AbuTalha)  
+- 💻 GitHub: [LearningGallery](https://github.com/LearningGallery)
