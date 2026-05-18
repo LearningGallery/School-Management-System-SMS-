@@ -1,4 +1,8 @@
+<div align="center">
+
 # 🎓 School Management System (SMS)
+
+### ☁️ Azure-native • 🏗️ Terraform-driven • 🚀 Cloud-native • 📚 Portfolio-ready
 
 ![Terraform](https://img.shields.io/badge/Terraform-%3E%3D%201.7.0-623CE4?logo=terraform&logoColor=white)
 ![Azure](https://img.shields.io/badge/Microsoft%20Azure-Cloud-0078D4?logo=microsoftazure&logoColor=white)
@@ -16,6 +20,8 @@
 ![Docs](https://img.shields.io/badge/Docs-Complete-brightgreen)
 ![Demo Ready](https://img.shields.io/badge/Demo-Ready-success)
 
+</div>
+
 ---
 
 ☁️ A cloud-native School Management System built on **Microsoft Azure** using **Terraform**, **Azure Container Apps**, **Azure SQL Database**, **Azure Storage**, and **Azure Front Door**.
@@ -25,6 +31,19 @@ This project is designed as:
 - 🏗️ an Azure-native reference architecture,
 - 🚀 a fully deployable infrastructure + application solution,
 - 📚 a documentation-rich enterprise-style demo.
+
+---
+
+## 🔎 At a Glance
+
+- **Frontend:** Next.js
+- **Backend:** .NET 8 Web API
+- **Worker:** .NET Worker Service
+- **Runtime:** Azure Container Apps
+- **Database:** Azure SQL Database
+- **Storage:** Azure Blob Storage
+- **Edge:** Azure Front Door Standard
+- **IaC:** Terraform
 
 ---
 
@@ -53,6 +72,90 @@ The solution consists of:
 Requests flow through **Azure Front Door**, which routes traffic to the web app and API.  
 The API integrates with **Azure SQL Database**, **Azure Blob Storage**, and **Azure monitoring services**.  
 Container images are stored in **Azure Container Registry** and deployed to **Azure Container Apps**.
+
+---
+
+## 🏛️ Architecture Diagrams
+
+### Runtime Architecture
+```mermaid
+flowchart TB
+    classDef user fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1,stroke-width:2px;
+    classDef edge fill:#fff3e0,stroke:#fb8c00,color:#e65100,stroke-width:2px;
+    classDef app fill:#e8f5e9,stroke:#43a047,color:#1b5e20,stroke-width:2px;
+    classDef data fill:#f3e5f5,stroke:#8e24aa,color:#4a148c,stroke-width:2px;
+    classDef monitor fill:#fce4ec,stroke:#d81b60,color:#880e4f,stroke-width:2px;
+    classDef registry fill:#ede7f6,stroke:#5e35b1,color:#311b92,stroke-width:2px;
+
+    U["💻 User Browser"]:::user
+    FD["🌐 Azure Front Door<br/>Standard<br/>Routing + HTTPS"]:::edge
+
+    WEB["🟩 Azure Container Apps<br/>sms-web"]:::app
+    API["🟩 Azure Container Apps<br/>sms-api"]:::app
+    WRK["🟩 Azure Container Apps<br/>sms-worker"]:::app
+
+    SQL[("🗄️ Azure SQL Database")]:::data
+    BLOB[("📦 Azure Blob Storage")]:::data
+    APPI[("📊 App Insights + Log Analytics")]:::monitor
+    ACR[("📁 Azure Container Registry")]:::registry
+
+    U --> FD
+    FD --> WEB
+    FD --> API
+
+    API --> SQL
+    API --> BLOB
+    API --> APPI
+
+    WRK --> SQL
+    WRK --> BLOB
+
+    ACR --> WEB
+    ACR --> API
+    ACR --> WRK
+```
+
+### Deployment Flow
+```mermaid
+flowchart LR
+    classDef dev fill:#fff8e1,stroke:#f9a825,color:#e65100,stroke-width:2px;
+    classDef iac fill:#e0f7fa,stroke:#00838f,color:#004d40,stroke-width:2px;
+    classDef registry fill:#ede7f6,stroke:#5e35b1,color:#311b92,stroke-width:2px;
+    classDef app fill:#e8f5e9,stroke:#43a047,color:#1b5e20,stroke-width:2px;
+    classDef edge fill:#fff3e0,stroke:#fb8c00,color:#e65100,stroke-width:2px;
+    classDef data fill:#f3e5f5,stroke:#8e24aa,color:#4a148c,stroke-width:2px;
+
+    DEV["👨‍💻 Developer"]:::dev
+    GIT["📘 GitHub Repository"]:::dev
+    CICD["⚙️ GitHub Actions / CI-CD"]:::dev
+    TF["🏗️ Terraform"]:::iac
+    ACR[("📁 Azure Container Registry")]:::registry
+
+    FD[("🌐 Azure Front Door")]:::edge
+    WEB["🟩 sms-web"]:::app
+    API["🟩 sms-api"]:::app
+    WRK["🟩 sms-worker"]:::app
+    SQL[("🗄️ Azure SQL")]:::data
+    BLOB[("📦 Blob Storage")]:::data
+    APPI[("📊 Monitoring")]:::data
+
+    DEV --> GIT
+    GIT --> CICD
+    CICD --> TF
+    CICD --> ACR
+
+    TF --> FD
+    TF --> WEB
+    TF --> API
+    TF --> WRK
+    TF --> SQL
+    TF --> BLOB
+    TF --> APPI
+
+    ACR --> WEB
+    ACR --> API
+    ACR --> WRK
+```
 
 ---
 
@@ -130,6 +233,7 @@ All documentation is located in the [`docs/`](./docs) folder.
 - [🧯 Troubleshooting](./docs/10-TROUBLESHOOTING.md)
 - [⚠️ Known Issues](./docs/11-KNOWN-ISSUES.md)
 - [🛣️ Roadmap](./docs/12-ROADMAP.md)
+- [🔄 Deployment Flow Diagram](./docs/13-DEPLOYMENT-FLOW-DIAGRAM.md)
 
 ### 🏗️ Architecture Decision Records
 - [ADR-001: Container Apps vs AKS](./docs/adr/ADR-001-Container-Apps-vs-AKS.md)
@@ -196,6 +300,23 @@ See [Known Issues](./docs/11-KNOWN-ISSUES.md) and [Roadmap](./docs/12-ROADMAP.md
 | Edge | Azure Front Door Standard |
 | Monitoring | Application Insights, Log Analytics |
 | IaC | Terraform |
+
+---
+
+## 🎯 Why This Project Matters
+
+This repository demonstrates:
+- practical Azure architecture design,
+- Terraform-based infrastructure delivery,
+- containerized application deployment,
+- modular documentation,
+- enterprise-style design decisions,
+- operational and troubleshooting readiness.
+
+It is intended to serve as:
+- a real deployment reference,
+- a portfolio-quality project,
+- a reusable architectural template for future cloud-native solutions.
 
 ---
 
